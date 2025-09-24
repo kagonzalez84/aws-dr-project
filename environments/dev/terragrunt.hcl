@@ -1,5 +1,13 @@
 # Development Environment Configuration
-# This file contains environment-specific inputs that can be shared across services
+# This file contains all configuration for the dev environment infrastructure
+
+include "root" {
+  path = find_in_parent_folders()
+}
+
+terraform {
+  source = "${get_path_to_repo_root()}//modules/infrastructure"
+}
 
 # Environment-specific inputs
 inputs = {
