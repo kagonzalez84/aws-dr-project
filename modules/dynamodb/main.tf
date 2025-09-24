@@ -55,8 +55,7 @@ resource "aws_dynamodb_table" "main" {
 
   # Server-side encryption
   server_side_encryption {
-    enabled     = true
-    kms_key_id  = var.kms_key_id
+    enabled = true
   }
 
   # Stream configuration for replication
@@ -122,8 +121,7 @@ resource "aws_dynamodb_table" "replica" {
   }
 
   server_side_encryption {
-    enabled     = true
-    kms_key_id  = var.secondary_kms_key_id
+    enabled = true
   }
 
   tags = merge(

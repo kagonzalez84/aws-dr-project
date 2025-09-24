@@ -15,11 +15,12 @@ terraform {
 }
 
 locals {
-  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.project_name}-${var.environment}-${random_string.bucket_suffix.result}"
+  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.project_name}-${var.environment}-${random_string.bucket_suffix[0].result}"
 }
 
-# Random string for unique bucket naming
+# Random string for unique bucket naming (only when bucket_name is not provided)
 resource "random_string" "bucket_suffix" {
+  count   = var.bucket_name == null ? 1 : 0
   length  = 8
   special = false
   upper   = false
