@@ -1,15 +1,36 @@
 # Root Terragrunt Configuration
 # This file contains shared configuration for all environments
+# Following Gruntwork best practices for Terragrunt configuration
+
+# Local values for common configuration
+locals {
+  # Common tags applied to all resources
+  common_tags = {
+    Project     = "aws-dr-project"
+    ManagedBy   = "terragrunt"
+    Repository  = "aws-dr-project"
+    IaC         = "terragrunt"
+  }
+  
+  # AWS account ID for state bucket naming
+  account_id = get_aws_account_id()
+}
 
 # Configure remote state backend
 remote_state {
   backend = "s3"
   config = {
-    bucket         = "terraform-state-${get_aws_account_id()}"
+    bucket         = "terraform-state-${local.account_id}"
     key            = "${path_relative_to_include()}/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "dr-project-terraform-locks"
+    
+    # Enable state locking and consistency checking
+    skip_bucket_versioning         = false
+    skip_bucket_ssencryption      = false
+    skip_bucket_root_access       = false
+    skip_bucket_enforced_tls      = false
   }
   generate = {
     path      = "backend.tf"
@@ -29,9 +50,9 @@ provider "aws" {
   default_tags {
     tags = {
       Project     = "aws-dr-project"
-      Environment = "dev"
       ManagedBy   = "terragrunt"
       Repository  = "aws-dr-project"
+      IaC         = "terragrunt"
     }
   }
 }
@@ -44,9 +65,9 @@ provider "aws" {
   default_tags {
     tags = {
       Project     = "aws-dr-project"
-      Environment = "dev"
       ManagedBy   = "terragrunt"
       Repository  = "aws-dr-project"
+      IaC         = "terragrunt"
       Purpose     = "disaster-recovery"
     }
   }
