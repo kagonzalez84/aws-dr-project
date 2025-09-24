@@ -4,10 +4,6 @@ include "root" {
   path = find_in_parent_folders()
 }
 
-include "env" {
-  path = find_in_parent_folders("env.hcl")
-}
-
 terraform {
   source = "${get_path_to_repo_root()}//modules/backup"
 }
@@ -32,6 +28,14 @@ dependency "s3" {
 }
 
 inputs = {
+  # Environment configuration
+  environment                     = "dev"
+  aws_region                     = "us-east-1"
+  aws_secondary_region           = "us-west-2"
+  enable_cross_region_replication = true
+  backup_retention_days          = 7
+  dr_backup_retention_days       = 14
+  
   # Backup configuration
   enable_cross_region_backup = true
   backup_schedule           = "cron(0 3 * * ? *)" # Daily at 3 AM
