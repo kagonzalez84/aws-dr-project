@@ -1,26 +1,14 @@
-# S3 Module with Disaster Recovery Features
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-      configuration_aliases = [aws.secondary]
-    }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
-  }
-}
+# =============================================
+# S3 RESOURCES
+# =============================================
 
 locals {
-  bucket_name = var.bucket_name != null ? var.bucket_name : "${var.project_name}-${var.environment}-${random_string.bucket_suffix[0].result}"
+  s3_bucket_name = var.s3_bucket_name != null ? var.s3_bucket_name : "${var.project_name}-${var.environment}-${random_string.bucket_suffix[0].result}"
 }
 
 # Random string for unique bucket naming (only when bucket_name is not provided)
 resource "random_string" "bucket_suffix" {
-  count   = var.bucket_name == null ? 1 : 0
+  count   = var.s3_bucket_name == null ? 1 : 0
   length  = 8
   special = false
   upper   = false
@@ -28,13 +16,13 @@ resource "random_string" "bucket_suffix" {
 
 # Primary S3 bucket
 resource "aws_s3_bucket" "main" {
-  bucket        = local.bucket_name
-  force_destroy = var.force_destroy
+  bucket        = local.s3_bucket_name
+  force_destroy = var.s3_force_destroy
 
   tags = merge(
     var.tags,
     {
-      Name        = local.bucket_name
+      Name        = local.s3_bucket_name
       Environment = var.environment
       Purpose     = "primary"
     }
@@ -45,8 +33,8 @@ resource "aws_s3_bucket" "main" {
 resource "aws_s3_bucket_versioning" "main" {
   bucket = aws_s3_bucket.main.id
   versioning_configuration {
-    status     = var.enable_versioning ? "Enabled" : "Suspended"
-    mfa_delete = var.enable_mfa_delete ? "Enabled" : "Disabled"
+    status     = var.s3_enable_versioning ? "Enabled" : "Suspended"
+    mfa_delete = var.s3_enable_mfa_delete ? "Enabled" : "Disabled"
   }
 }
 
@@ -56,10 +44,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = var.kms_key_id
-      sse_algorithm     = var.kms_key_id != null ? "aws:kms" : "AES256"
+      kms_master_key_id = var.s3_kms_key_id
+      sse_algorithm     = var.s3_kms_key_id != null ? "aws:kms" : "AES256"
     }
-    bucket_key_enabled = var.kms_key_id != null ? true : false
+    bucket_key_enabled = var.s3_kms_key_id != null ? true : false
   }
 }
 
@@ -67,21 +55,21 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
 resource "aws_s3_bucket_public_access_block" "main" {
   bucket = aws_s3_bucket.main.id
 
-  block_public_acls       = var.block_public_acls
-  block_public_policy     = var.block_public_policy
-  ignore_public_acls      = var.ignore_public_acls
-  restrict_public_buckets = var.restrict_public_buckets
+  block_public_acls       = var.s3_block_public_acls
+  block_public_policy     = var.s3_block_public_policy
+  ignore_public_acls      = var.s3_ignore_public_acls
+  restrict_public_buckets = var.s3_restrict_public_buckets
 }
 
 # Lifecycle configuration
 resource "aws_s3_bucket_lifecycle_configuration" "main" {
-  count = length(var.lifecycle_rules) > 0 ? 1 : 0
+  count = length(var.s3_lifecycle_rules) > 0 ? 1 : 0
 
   bucket     = aws_s3_bucket.main.id
   depends_on = [aws_s3_bucket_versioning.main]
 
   dynamic "rule" {
-    for_each = var.lifecycle_rules
+    for_each = var.s3_lifecycle_rules
     content {
       id     = rule.value.id
       status = rule.value.enabled ? "Enabled" : "Disabled"
@@ -90,23 +78,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "main" {
         for_each = rule.value.filter != null ? [rule.value.filter] : []
         content {
           prefix = filter.value.prefix
-          
-          dynamic "tag" {
-            for_each = filter.value.tags != null ? filter.value.tags : {}
-            content {
-              key   = tag.key
-              value = tag.value
-            }
-          }
-        }
-      }
-
-      dynamic "expiration" {
-        for_each = rule.value.expiration != null ? [rule.value.expiration] : []
-        content {
-          days                         = expiration.value.days
-          date                         = expiration.value.date
-          expired_object_delete_marker = expiration.value.expired_object_delete_marker
         }
       }
 
@@ -121,7 +92,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "main" {
         for_each = rule.value.transitions != null ? rule.value.transitions : []
         content {
           days          = transition.value.days
-          date          = transition.value.date
           storage_class = transition.value.storage_class
         }
       }
@@ -142,13 +112,13 @@ resource "aws_s3_bucket" "replica" {
   count = var.enable_cross_region_replication ? 1 : 0
 
   provider      = aws.secondary
-  bucket        = "${local.bucket_name}-replica"
-  force_destroy = var.force_destroy
+  bucket        = "${local.s3_bucket_name}-replica"
+  force_destroy = var.s3_force_destroy
 
   tags = merge(
     var.tags,
     {
-      Name        = "${local.bucket_name}-replica"
+      Name        = "${local.s3_bucket_name}-replica"
       Environment = var.environment
       Purpose     = "disaster-recovery"
     }
@@ -175,10 +145,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "replica" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = var.secondary_kms_key_id
-      sse_algorithm     = var.secondary_kms_key_id != null ? "aws:kms" : "AES256"
+      kms_master_key_id = var.s3_secondary_kms_key_id
+      sse_algorithm     = var.s3_secondary_kms_key_id != null ? "aws:kms" : "AES256"
     }
-    bucket_key_enabled = var.secondary_kms_key_id != null ? true : false
+    bucket_key_enabled = var.s3_secondary_kms_key_id != null ? true : false
   }
 }
 
@@ -276,12 +246,12 @@ resource "aws_s3_bucket_replication_configuration" "main" {
 
     destination {
       bucket        = aws_s3_bucket.replica[0].arn
-      storage_class = var.replication_storage_class
+      storage_class = var.s3_replication_storage_class
 
       dynamic "encryption_configuration" {
-        for_each = var.secondary_kms_key_id != null ? [1] : []
+        for_each = var.s3_secondary_kms_key_id != null ? [1] : []
         content {
-          replica_kms_key_id = var.secondary_kms_key_id
+          replica_kms_key_id = var.s3_secondary_kms_key_id
         }
       }
     }
@@ -292,15 +262,15 @@ resource "aws_s3_bucket_replication_configuration" "main" {
 
 # Notification configuration for monitoring
 resource "aws_s3_bucket_notification" "main" {
-  count = var.enable_notifications ? 1 : 0
+  count = var.s3_enable_notifications ? 1 : 0
 
   bucket = aws_s3_bucket.main.id
 
   dynamic "topic" {
-    for_each = var.sns_topic_arn != null ? [var.sns_topic_arn] : []
+    for_each = var.s3_sns_topic_arn != null ? [var.s3_sns_topic_arn] : []
     content {
       topic_arn = topic.value
-      events    = var.notification_events
+      events    = var.s3_notification_events
     }
   }
 }

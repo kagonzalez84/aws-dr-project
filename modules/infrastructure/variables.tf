@@ -1,4 +1,4 @@
-# Variables for the unified Infrastructure module
+# Variables for the consolidated Infrastructure module
 
 # Common variables
 variable "project_name" {
@@ -107,6 +107,66 @@ variable "dynamodb_enable_streams" {
   default     = false
 }
 
+variable "dynamodb_stream_view_type" {
+  description = "When an item in the table is modified, what information is written to the stream"
+  type        = string
+  default     = "NEW_AND_OLD_IMAGES"
+}
+
+variable "dynamodb_read_capacity" {
+  description = "Number of read units for this table"
+  type        = number
+  default     = 5
+}
+
+variable "dynamodb_write_capacity" {
+  description = "Number of write units for this table"
+  type        = number
+  default     = 5
+}
+
+variable "dynamodb_enable_autoscaling" {
+  description = "Enable autoscaling for DynamoDB table"
+  type        = bool
+  default     = false
+}
+
+variable "dynamodb_autoscaling_read_max_capacity" {
+  description = "Maximum read capacity for autoscaling"
+  type        = number
+  default     = 100
+}
+
+variable "dynamodb_autoscaling_read_min_capacity" {
+  description = "Minimum read capacity for autoscaling"
+  type        = number
+  default     = 5
+}
+
+variable "dynamodb_autoscaling_read_target_value" {
+  description = "Target value for read capacity autoscaling"
+  type        = number
+  default     = 70
+}
+
+variable "dynamodb_autoscaling_write_max_capacity" {
+  description = "Maximum write capacity for autoscaling"
+  type        = number
+  default     = 100
+}
+
+variable "dynamodb_autoscaling_write_min_capacity" {
+  description = "Minimum write capacity for autoscaling"
+  type        = number
+  default     = 5
+}
+
+variable "dynamodb_autoscaling_write_target_value" {
+  description = "Target value for write capacity autoscaling"
+  type        = number
+  default     = 70
+}
+
 # S3 specific variables
 variable "s3_bucket_name" {
   description = "Name of the S3 bucket (if not provided, will be generated)"
@@ -130,6 +190,54 @@ variable "s3_enable_mfa_delete" {
   description = "Enable MFA delete for the S3 bucket"
   type        = bool
   default     = false
+}
+
+variable "s3_kms_key_id" {
+  description = "The AWS KMS master key ID used for the SSE-KMS encryption"
+  type        = string
+  default     = null
+}
+
+variable "s3_secondary_kms_key_id" {
+  description = "The AWS KMS master key ID for the secondary region"
+  type        = string
+  default     = null
+}
+
+variable "s3_block_public_acls" {
+  description = "Whether Amazon S3 should block public ACLs for this bucket"
+  type        = bool
+  default     = true
+}
+
+variable "s3_block_public_policy" {
+  description = "Whether Amazon S3 should block public bucket policies for this bucket"
+  type        = bool
+  default     = true
+}
+
+variable "s3_ignore_public_acls" {
+  description = "Whether Amazon S3 should ignore public ACLs for this bucket"
+  type        = bool
+  default     = true
+}
+
+variable "s3_restrict_public_buckets" {
+  description = "Whether Amazon S3 should restrict public bucket policies for this bucket"
+  type        = bool
+  default     = true
+}
+
+variable "s3_replication_storage_class" {
+  description = "Storage class for cross-region replication"
+  type        = string
+  default     = "STANDARD_IA"
+}
+
+variable "s3_sns_topic_arn" {
+  description = "SNS topic ARN for S3 bucket notifications"
+  type        = string
+  default     = null
 }
 
 variable "s3_lifecycle_rules" {
@@ -190,4 +298,85 @@ variable "backup_completion_window" {
   description = "The amount of time in minutes AWS Backup attempts a backup before canceling the job"
   type        = number
   default     = 120
+}
+
+variable "backup_cold_storage_after" {
+  description = "Specifies the number of days after creation that a recovery point is moved to cold storage"
+  type        = number
+  default     = 30
+}
+
+variable "backup_dr_cold_storage_after" {
+  description = "Specifies the number of days after creation that a DR recovery point is moved to cold storage"
+  type        = number
+  default     = 60
+}
+
+variable "backup_enable_dynamodb_continuous_backup" {
+  description = "Enable continuous backup for DynamoDB"
+  type        = bool
+  default     = true
+}
+
+variable "backup_dynamodb_backup_schedule" {
+  description = "DynamoDB backup schedule in cron format"
+  type        = string
+  default     = "cron(0 2 * * ? *)"
+}
+
+variable "backup_dynamodb_backup_retention_days" {
+  description = "Number of days to retain DynamoDB backups"
+  type        = number
+  default     = 35
+}
+
+variable "backup_enable_dynamodb_backup" {
+  description = "Enable backup for DynamoDB tables"
+  type        = bool
+  default     = true
+}
+
+variable "backup_enable_s3_backup" {
+  description = "Enable backup for S3 buckets"
+  type        = bool
+  default     = true
+}
+
+variable "backup_tag_conditions" {
+  description = "Tag conditions for backup selection"
+  type = list(object({
+    key   = string
+    value = string
+  }))
+  default = [
+    {
+      key   = "BackupEnabled"
+      value = "true"
+    }
+  ]
+}
+
+variable "backup_enable_backup_notifications" {
+  description = "Enable backup notifications"
+  type        = bool
+  default     = true
+}
+
+variable "backup_notification_events" {
+  description = "List of backup events to notify on"
+  type        = list(string)
+  default = [
+    "BACKUP_JOB_STARTED",
+    "BACKUP_JOB_COMPLETED",
+    "BACKUP_JOB_FAILED",
+    "RESTORE_JOB_STARTED", 
+    "RESTORE_JOB_COMPLETED",
+    "RESTORE_JOB_FAILED"
+  ]
+}
+
+variable "backup_enable_backup_monitoring" {
+  description = "Enable backup monitoring with CloudWatch alarms"
+  type        = bool
+  default     = true
 }

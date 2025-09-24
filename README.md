@@ -15,15 +15,22 @@ The project implements a comprehensive disaster recovery strategy using:
 
 ```
 ├── modules/                    # Reusable Terraform modules
-│   ├── dynamodb/              # DynamoDB table with DR features
-│   ├── s3/                    # S3 bucket with versioning and replication
-│   └── backup/                # AWS Backup configuration
+│   └── infrastructure/        # Consolidated module with all AWS resources
+│       ├── main.tf            # Main Terraform configuration and providers
+│       ├── s3.tf              # S3 resources with versioning and replication
+│       ├── dynamodb.tf        # DynamoDB tables with DR features
+│       ├── backup.tf          # AWS Backup configuration and policies
+│       ├── variables.tf       # Input variables for all services
+│       └── outputs.tf         # Output values from all resources
 ├── environments/              # Environment-specific configurations
+│   ├── common.hcl             # Shared configuration across environments
 │   ├── dev/                   # Development environment
+│   │   └── terragrunt.hcl     # Dev-specific configuration
 │   └── prod/                  # Production environment
+│       └── terragrunt.hcl     # Prod-specific configuration
 ├── scripts/                   # Utility scripts for testing DR
 ├── docs/                      # DR documentation and runbooks
-└── terragrunt.hcl            # Root Terragrunt configuration
+└── root.hcl                   # Root Terragrunt configuration
 ```
 
 ## Getting Started

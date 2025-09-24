@@ -1,14 +1,6 @@
-# AWS Backup Module for Disaster Recovery
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-      configuration_aliases = [aws.secondary]
-    }
-  }
-}
+# =============================================
+# BACKUP RESOURCES
+# =============================================
 
 # KMS key for backup encryption
 resource "aws_kms_key" "backup" {
@@ -62,7 +54,7 @@ resource "aws_kms_alias" "backup" {
 
 # KMS key for DR region
 resource "aws_kms_key" "backup_dr" {
-  count = var.enable_cross_region_backup ? 1 : 0
+  count = var.backup_enable_cross_region_backup ? 1 : 0
 
   provider                = aws.secondary
   description             = "${var.project_name}-${var.environment}-backup-dr-key"
@@ -110,7 +102,7 @@ resource "aws_kms_key" "backup_dr" {
 }
 
 resource "aws_kms_alias" "backup_dr" {
-  count = var.enable_cross_region_backup ? 1 : 0
+  count = var.backup_enable_cross_region_backup ? 1 : 0
 
   provider      = aws.secondary
   name          = "alias/${var.project_name}-${var.environment}-backup-dr"
@@ -133,7 +125,7 @@ resource "aws_backup_vault" "main" {
 
 # DR backup vault in secondary region
 resource "aws_backup_vault" "dr" {
-  count = var.enable_cross_region_backup ? 1 : 0
+  count = var.backup_enable_cross_region_backup ? 1 : 0
 
   provider    = aws.secondary
   name        = "${var.project_name}-${var.environment}-backup-vault-dr"
@@ -208,11 +200,11 @@ resource "aws_backup_plan" "main" {
 
     # Cross-region copy action for disaster recovery
     dynamic "copy_action" {
-      for_each = var.enable_cross_region_backup ? [1] : []
+      for_each = var.backup_enable_cross_region_backup ? [1] : []
       content {
         destination_vault_arn = aws_backup_vault.dr[0].arn
         lifecycle {
-          cold_storage_after = var.dr_backup_cold_storage_after
+          cold_storage_after = var.backup_dr_cold_storage_after
           delete_after       = var.dr_backup_retention_days
         }
       }
@@ -221,11 +213,11 @@ resource "aws_backup_plan" "main" {
 
   # DynamoDB continuous backup rule
   dynamic "rule" {
-    for_each = var.enable_dynamodb_continuous_backup ? [1] : []
+    for_each = var.backup_enable_dynamodb_continuous_backup ? [1] : []
     content {
       rule_name                = "dynamodb_continuous_backup"
       target_vault_name        = aws_backup_vault.main.name
-      schedule                 = var.dynamodb_backup_schedule
+      schedule                 = var.backup_dynamodb_backup_schedule
       enable_continuous_backup = true
 
       start_window      = 30   # DynamoDB backups are fast
@@ -240,11 +232,11 @@ resource "aws_backup_plan" "main" {
       )
 
       lifecycle {
-        delete_after = var.dynamodb_backup_retention_days
+        delete_after = var.backup_dynamodb_backup_retention_days
       }
 
       dynamic "copy_action" {
-        for_each = var.enable_cross_region_backup ? [1] : []
+        for_each = var.backup_enable_cross_region_backup ? [1] : []
         content {
           destination_vault_arn = aws_backup_vault.dr[0].arn
           lifecycle {
@@ -266,13 +258,13 @@ resource "aws_backup_plan" "main" {
 
 # Backup selection for DynamoDB tables
 resource "aws_backup_selection" "dynamodb" {
-  count = var.enable_dynamodb_backup ? 1 : 0
+  count = var.backup_enable_dynamodb_backup ? 1 : 0
 
   iam_role_arn = aws_iam_role.backup.arn
   name         = "${var.project_name}-${var.environment}-dynamodb-backup-selection"
   plan_id      = aws_backup_plan.main.id
 
-  resources = var.dynamodb_table_arns
+  resources = [aws_dynamodb_table.main.arn]
 
   dynamic "condition" {
     for_each = length(var.backup_tag_conditions) > 0 ? [1] : []
@@ -290,13 +282,13 @@ resource "aws_backup_selection" "dynamodb" {
 
 # Backup selection for S3 buckets
 resource "aws_backup_selection" "s3" {
-  count = var.enable_s3_backup ? 1 : 0
+  count = var.backup_enable_s3_backup ? 1 : 0
 
   iam_role_arn = aws_iam_role.backup.arn
   name         = "${var.project_name}-${var.environment}-s3-backup-selection"
   plan_id      = aws_backup_plan.main.id
 
-  resources = var.s3_bucket_arns
+  resources = [aws_s3_bucket.main.arn]
 
   dynamic "condition" {
     for_each = length(var.backup_tag_conditions) > 0 ? [1] : []
@@ -314,7 +306,7 @@ resource "aws_backup_selection" "s3" {
 
 # SNS topic for backup notifications
 resource "aws_sns_topic" "backup_notifications" {
-  count = var.enable_backup_notifications ? 1 : 0
+  count = var.backup_enable_backup_notifications ? 1 : 0
 
   name = "${var.project_name}-${var.environment}-backup-notifications"
 
@@ -323,7 +315,7 @@ resource "aws_sns_topic" "backup_notifications" {
 
 # Backup vault notifications
 resource "aws_backup_vault_notifications" "main" {
-  count = var.enable_backup_notifications ? 1 : 0
+  count = var.backup_enable_backup_notifications ? 1 : 0
 
   backup_vault_name   = aws_backup_vault.main.name
   sns_topic_arn       = aws_sns_topic.backup_notifications[0].arn
@@ -332,7 +324,7 @@ resource "aws_backup_vault_notifications" "main" {
 
 # CloudWatch alarm for failed backups
 resource "aws_cloudwatch_metric_alarm" "backup_failure" {
-  count = var.enable_backup_monitoring ? 1 : 0
+  count = var.backup_enable_backup_monitoring ? 1 : 0
 
   alarm_name          = "${var.project_name}-${var.environment}-backup-failure"
   comparison_operator = "GreaterThanThreshold"
@@ -343,7 +335,7 @@ resource "aws_cloudwatch_metric_alarm" "backup_failure" {
   statistic           = "Sum"
   threshold           = "0"
   alarm_description   = "This metric monitors backup job failures"
-  alarm_actions       = var.enable_backup_notifications ? [aws_sns_topic.backup_notifications[0].arn] : []
+  alarm_actions       = var.backup_enable_backup_notifications ? [aws_sns_topic.backup_notifications[0].arn] : []
 
   dimensions = {
     BackupVaultName = aws_backup_vault.main.name
@@ -351,6 +343,3 @@ resource "aws_cloudwatch_metric_alarm" "backup_failure" {
 
   tags = var.tags
 }
-
-# Data source for current AWS account
-data "aws_caller_identity" "current" {}
